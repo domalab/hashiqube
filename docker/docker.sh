@@ -69,11 +69,16 @@ docker run -d --restart=always \
   -e REGISTRY_HTTP_ADDR=0.0.0.0:5002 \
   --memory 256M -p 5002:5002 registry:2
 
+# Setting up registry credentials from environment variables with defaults if not set
+REGISTRY_USER=${REGISTRY_USER:-admin}
+REGISTRY_PASS=${REGISTRY_PASS:-password}
+REGISTRY_EMAIL=${REGISTRY_EMAIL:-admin@localhost}
+
 cat <<EOF | sudo tee /etc/docker/auth.json
 {
-  "username": "admin",
-  "password": "password",
-  "email": "admin@localhost"
+  "username": "${REGISTRY_USER}",
+  "password": "${REGISTRY_PASS}",
+  "email": "${REGISTRY_EMAIL}"
 }
 EOF
 
@@ -81,7 +86,7 @@ echo -e '\e[38;5;198m'"++++ "
 echo -e '\e[38;5;198m'"++++ Docker Login to Registry"
 echo -e '\e[38;5;198m'"++++ "
 sleep 10;
-sudo --preserve-env=PATH -u vagrant docker login -u="admin" -p="password" http://10.9.99.10:5002
+sudo --preserve-env=PATH -u vagrant docker login -u="${REGISTRY_USER}" -p="${REGISTRY_PASS}" http://10.9.99.10:5002
 
 # echo -e '\e[38;5;198m'"++++ "
 # echo -e '\e[38;5;198m'"++++ Docker build -t apache2 ."
