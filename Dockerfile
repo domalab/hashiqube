@@ -43,12 +43,22 @@ RUN useradd -m -G sudo -s /bin/bash vagrant && \
     echo 'vagrant ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/vagrant && \
     chmod 440 /etc/sudoers.d/vagrant
 
-# Establish ssh keys for vagrant
-RUN mkdir -p /home/vagrant/.ssh; \
-    chmod 700 /home/vagrant/.ssh
-RUN wget -q -O /home/vagrant/.ssh/authorized_keys https://raw.githubusercontent.com/hashicorp/vagrant/master/keys/vagrant.pub
-RUN chmod 600 /home/vagrant/.ssh/authorized_keys; \
+# Generate unique SSH keys for vagrant user
+RUN mkdir -p /home/vagrant/.ssh && \
+    chmod 700 /home/vagrant/.ssh && \
+    sudo -u vagrant ssh-keygen -t rsa -b 4096 -f /home/vagrant/.ssh/id_rsa -N "" && \
+    cp /home/vagrant/.ssh/id_rsa.pub /home/vagrant/.ssh/authorized_keys && \
+    chmod 600 /home/vagrant/.ssh/authorized_keys && \
     chown -R vagrant:vagrant /home/vagrant/.ssh
+
+# Save the private key to a mount point so Vagrant can use it for SSH access
+RUN mkdir -p /vagrant_keys && \
+    cp /home/vagrant/.ssh/id_rsa /vagrant_keys/ && \
+    chmod 644 /vagrant_keys/id_rsa
+VOLUME ["/vagrant_keys"]
+
+# Add a note to remind users to configure Vagrant to use the generated key
+RUN echo "# IMPORTANT: Use the generated key at /vagrant_keys/id_rsa for SSH access" > /home/vagrant/README.txt
 
 # Run the init daemon
 VOLUME [ "/sys/fs/cgroup" ]
