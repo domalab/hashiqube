@@ -195,30 +195,40 @@ echo -e '\e[38;5;198m'"++++ Auto unseal vault"
 echo -e '\e[38;5;198m'"++++ "
 for i in $(cat /etc/vault/init.file | grep Unseal | cut -d " " -f4 | head -n 3); do vault operator unseal $i; done
 vault status
-cat /etc/vault/init.file
-# add vault ENV variables
-VAULT_TOKEN=$(grep 'Initial Root Token' /etc/vault/init.file | cut -d ':' -f2 | tr -d ' ')
-grep -q "${VAULT_TOKEN}" /etc/environment
+
+# Extract root token but don't expose it
+VAULT_ROOT_TOKEN=$(grep 'Initial Root Token' /etc/vault/init.file | cut -d ':' -f2 | tr -d ' ')
+
+# Create a temporary token with reduced privileges instead of using root token
+echo -e '\e[38;5;198m'"++++ Creating temporary token with limited privileges"
+export VAULT_TOKEN="$VAULT_ROOT_TOKEN"
+TEMP_TOKEN=$(vault token create -policy="default" -display-name="temp-setup-token" -ttl="1h" -format=json | jq -r ".auth.client_token")
+
+# Use temporary token for environment instead of root token
+grep -q "VAULT_TOKEN=" /etc/environment
 if [ $? -eq 1 ]; then
-  echo "VAULT_TOKEN=${VAULT_TOKEN}" >> /etc/environment
+  echo "VAULT_TOKEN=${TEMP_TOKEN}" >> /etc/environment
 else
-  sed -i "s/VAULT_TOKEN=.*/VAULT_TOKEN=${VAULT_TOKEN}/g" /etc/environment
-fi
-grep -q "VAULT_ADDR=http://127.0.0.1:8200" /etc/environment
-if [ $? -eq 1 ]; then
-  echo "VAULT_ADDR=http://127.0.0.1:8200" >> /etc/environment
-else
-  sed -i "s%VAULT_ADDR=.*%VAULT_ADDR=http://127.0.0.1:8200%g" /etc/environment
+  sed -i "s/VAULT_TOKEN=.*/VAULT_TOKEN=${TEMP_TOKEN}/g" /etc/environment
 fi
 
+# Set secure permissions on init file
+sudo chmod 600 /etc/vault/init.file
+grep -q "VAULT_ADDR=http://127.0.0.1:8200" /etc/environment
 echo -e '\e[38;5;198m'"++++ "
-echo -e '\e[38;5;198m'"++++ Vault status"
+echo -e '\e[38;5;198m'"++++ Vault credentials stored securely in /etc/vault/init.file"
 echo -e '\e[38;5;198m'"++++ "
-vault status
+echo -e '\e[38;5;198m'"++++ WARNING: Root token should only be used for initial setup or emergency recovery"
+if [ -f /vagrant/vault/license.hclic ]; then
+  echo -e '\e[38;5;198m'"++++ "
+  echo -e '\e[38;5;198m'"++++ Vault License Inspect"
+  echo -e '\e[38;5;198m'"++++ "
+  vault license inspect /vagrant/vault/license.hclic
+fi
 echo -e '\e[38;5;198m'"++++ "
-echo -e '\e[38;5;198m'"++++ Cat Vault Credentials"
+echo -e '\e[38;5;198m'"++++ Access Vault"
 echo -e '\e[38;5;198m'"++++ "
-cat /etc/vault/init.file
+echo -e '\e[38;5;198m'"++++ Temporary token created with limited privileges and 1-hour TTL"
 if [ -f /vagrant/vault/license.hclic ]; then
   echo -e '\e[38;5;198m'"++++ "
   echo -e '\e[38;5;198m'"++++ Vault License Inspect"
